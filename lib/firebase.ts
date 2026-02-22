@@ -21,11 +21,15 @@ try {
     auth = getAuth(app);
     db = getFirestore(app);
     console.log("✅ Firebase services initialized successfully");
+    console.log("   - Auth Domain:", firebaseConfig.authDomain);
+    console.log("   - Project ID:", firebaseConfig.projectId);
   } else {
-    console.warn("⚠️ Firebase configuration missing. App will run in mock mode.");
+    console.warn("⚠️ Firebase configuration missing: VITE_FIREBASE_API_KEY is undefined.");
+    console.warn("   App will run in MOCK MODE (LocalStorage only).");
   }
 } catch (error) {
-  console.error("❌ Firebase initialization failed:", error);
+  console.error("❌ Firebase initialization FAILED:", error);
+  console.error("   App falling back to MOCK MODE.");
 }
 
 export { auth, db };

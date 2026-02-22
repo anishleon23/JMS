@@ -1,4 +1,4 @@
-import { MenuItem, Order, PresetMenu } from '../types';
+import { MenuItem, Order, PresetMenu, User, UserRole } from '../types';
 
 export const INITIAL_MENU_ITEMS: MenuItem[] = [
   { id: '1', name: 'Idly (2 pcs)', description: 'Steamed rice cakes served with sambar and chutney', price: 40, category: 'Veg', foodCategory: 'Tiffen' },
@@ -81,5 +81,21 @@ export const INITIAL_ORDERS: Order[] = [
     status: 'Completed',
     totalEstimatedCost: 4000,
     createdAt: Date.now() - 864000000
+  }
+];
+
+export const INITIAL_USERS: User[] = [
+  {
+    username: 'admin',
+    role: UserRole.ADMIN,
+    name: 'J. Mohan Singh',
+    phone: '9840364388',
+    password: 'admin'
+  },
+  {
+    username: 'customer1',
+    role: UserRole.CUSTOMER,
+    name: 'Rajesh Kumar',
+    phone: '9876543210'
   }
 ];

@@ -70,4 +70,5 @@ export interface User {
   role: UserRole;
   name?: string;
   phone?: string;
+  password?: string; // For Admin/Staff login
 }

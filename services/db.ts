@@ -1,7 +1,7 @@
 import { db } from '../lib/firebase.ts';
 import { collection, getDocs, addDoc, doc, query, where, deleteDoc, updateDoc, limit } from 'firebase/firestore';
-import { MenuItem, Order, PresetMenu } from '../types.ts';
-import { INITIAL_MENU_ITEMS, INITIAL_ORDERS, INITIAL_PRESET_MENUS } from './mockData.ts';
+import { MenuItem, Order, PresetMenu, User } from '../types.ts';
+import { INITIAL_MENU_ITEMS, INITIAL_ORDERS, INITIAL_PRESET_MENUS, INITIAL_USERS } from './mockData.ts';
 
 // Helper to load from localStorage with fallback
 const loadFromStorage = <T>(key: string, fallback: T): T => {
@@ -18,6 +18,7 @@ const saveToStorage = <T>(key: string, data: T) => {
 let mockMenuItems: MenuItem[] = loadFromStorage('jms_menuItems', INITIAL_MENU_ITEMS);
 let mockPresetMenus: PresetMenu[] = loadFromStorage('jms_presetMenus', INITIAL_PRESET_MENUS);
 let mockOrders: Order[] = loadFromStorage('jms_orders', INITIAL_ORDERS);
+let mockUsers: User[] = loadFromStorage('jms_users', INITIAL_USERS);
 
 export const getMenuItems = async (): Promise<MenuItem[]> => {
   if (db) {
@@ -152,4 +153,56 @@ export const getCustomerByPhone = async (phone: string): Promise<string | null> 
     if (order) return order.customerName;
   }
   return null;
+}
+
+export const getUserByPhone = async (phone: string): Promise<User | null> => {
+  if (!phone) return null;
+
+  if (db) {
+    try {
+      // Ideally we would have a 'users' collection, but for now we might check if they are in our mock list 
+      // or if we decide to store users in firebase 'users' collection.
+      const q = query(collection(db, "users"), where("phone", "==", phone), limit(1));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) return snapshot.docs[0].data() as User;
+    } catch (e) { console.error(e); }
+  }
+  mockUsers = loadFromStorage('jms_users', INITIAL_USERS);
+  const user = mockUsers.find(u => u.phone === phone);
+  return user || null;
+}
+
+export const addUser = async (user: User): Promise<User> => {
+  if (db) {
+    try {
+      await addDoc(collection(db, "users"), user);
+      return user;
+    } catch (e) {
+      console.error("Error adding user to Firebase:", e);
+    }
+  }
+
+  mockUsers.push(user);
+  saveToStorage('jms_users', mockUsers);
+  return Promise.resolve(user);
+}
+
+export const updateUser = async (user: User): Promise<User> => {
+  if (db) {
+    try {
+      const q = query(collection(db, "users"), where("phone", "==", user.phone), limit(1));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        const docId = snapshot.docs[0].id;
+        await updateDoc(doc(db, "users", docId), user as any);
+        return user;
+      }
+    } catch (e) {
+      console.error("Error updating user in Firebase:", e);
+    }
+  }
+
+  mockUsers = mockUsers.map(u => u.phone === user.phone ? user : u);
+  saveToStorage('jms_users', mockUsers);
+  return Promise.resolve(user);
 }

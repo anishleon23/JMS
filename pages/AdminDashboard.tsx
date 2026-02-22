@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { MenuItem, Order, PresetMenu, AdditionalCost } from '../types';
-import { Plus, Trash2, Calendar as CalendarIcon, FileText, IndianRupee, Package, Utensils, X, BarChart2, Check, Edit2, Clock } from 'lucide-react';
+import { MenuItem, Order, PresetMenu, AdditionalCost, OrderItem } from '../types';
+import { Plus, Trash2, Calendar as CalendarIcon, FileText, IndianRupee, Package, Utensils, X, BarChart2, Check, Edit2, Clock, User, Phone, MapPin } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { format } from 'date-fns';
 
@@ -29,6 +29,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   viewMode
 }) => {
   const [activeTab, setActiveTab] = useState<'menu' | 'packages' | 'calendar'>('calendar');
+  const [filterType, setFilterType] = useState<'All' | 'Pending' | 'Month' | 'Future'>('All'); // New Filter State
+  const [highlightOrderId, setHighlightOrderId] = useState<string | null>(null); // To scroll to specific order
   const [editingOrder, setEditingOrder] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState<number>(0);
 
@@ -69,6 +71,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [tempFixedItem, setTempFixedItem] = useState('');
   const [tempOptionLabel, setTempOptionLabel] = useState('');
   const [tempOptionChoices, setTempOptionChoices] = useState(''); // Comma separated
+
+  // --- Order Details Modal State ---
+  const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<Order | null>(null);
 
   // --- Handlers for A La Carte Menu ---
   const handleAddItem = () => {
@@ -147,10 +152,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // --- Quote Estimation Handlers ---
+
+  // Custom manual override for total cost
+  const [manualTotalCost, setManualTotalCost] = useState<number | null>(null);
+
   const startEstimating = (order: Order) => {
     setEstimatingOrder(order.id);
-    setPerHeadAmount(order.perHeadAmount || 0);
+    setPerHeadAmount(order.perHeadAmount || 0); // Default to 0, admin sets it
     setGuestCount(order.guestCount || 0);
+    setManualTotalCost(order.totalEstimatedCost > 0 ? order.totalEstimatedCost : null);
+
     setAdditionalCosts(prev => ({
       ...prev,
       [order.id]: order.additionalCosts || []
@@ -158,26 +169,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const calculateEstimate = (orderId: string) => {
-    console.log('calculateEstimate start for:', orderId);
-    console.log('perHeadAmount:', perHeadAmount, 'guestCount:', guestCount);
-
     const baseCost = perHeadAmount * guestCount;
     const costs = additionalCosts[orderId] || [];
-    console.log('Additional Costs:', costs);
-
     const additionalTotal = costs.reduce((sum, cost) => {
       return sum + (cost.amount * (cost.quantity || 1));
     }, 0);
-
-    console.log('Base:', baseCost, 'Additional:', additionalTotal);
     return baseCost + additionalTotal;
   };
 
+  const finalTotalEstimate = (orderId: string) => {
+    // If manual override is set (even if 0, admin might want 0), use it. 
+    // BUT we only use it if it was explicitly typed. 
+    // Let's rely on the input field value.
+    if (manualTotalCost !== null) return manualTotalCost;
+    return calculateEstimate(orderId);
+  }
+
   const submitQuote = (order: Order) => {
     try {
-      console.log('Submitting quote for order:', order.id);
-      const total = calculateEstimate(order.id);
-      console.log('Calculated total:', total);
+      // Logic: If user edited the Total field manually, use that.
+      // If they were editing Per Head, calculate it.
+      // We can use the current displayed total as the truth.
+
+      // Determine if we should use calculated or manual
+      // For simplicity, we can pass the final value from the render logic to here, 
+      // or re-derive. 
+      // If manualTotalCost is set, use it. Else calculate.
+
+      const total = manualTotalCost !== null ? manualTotalCost : calculateEstimate(order.id);
 
       const updatedOrder = {
         ...order,
@@ -187,10 +206,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         totalEstimatedCost: total
       };
 
-      console.log('Calling onUpdateOrder with:', updatedOrder);
       onUpdateOrder(updatedOrder);
       setEstimatingOrder(null);
-      // alert('Quote updated successfully!'); 
+      setManualTotalCost(null);
     } catch (error) {
       console.error('Error in submitQuote:', error);
       alert('Failed to submit quote. See console for details.');
@@ -383,7 +401,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const otherItems = remainingItems.filter(i => i.category !== 'Non-Veg' && i.category !== 'Veg');
 
     // Drawing Helper
-    const drawItemList = (title: string, items: MenuItem[], xPos: number, startY: number, count?: number) => {
+    const drawItemList = (title: string, items: OrderItem[], xPos: number, startY: number, count?: number) => {
       let currentY = startY;
 
       // Header
@@ -603,7 +621,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       last6Months.push({ month: format(d, 'MMM'), count });
     }
 
-    return { totalOrders: orders.length, monthlyOrders: monthlyOrders.length, totalRevenue, monthlyRevenue, last6Months };
+    const pendingQuotes = orders.filter(o => !o.totalEstimatedCost || o.totalEstimatedCost === 0).length;
+
+    // Upcoming Orders (Future dates)
+    const upcomingOrders = orders
+      .filter(o => new Date(o.eventDate) >= new Date())
+      .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
+
+    // Current Month Orders List
+    const currentMonthOrdersList = monthlyOrders.sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
+
+    return { totalOrders: orders.length, monthlyOrders: monthlyOrders.length, totalRevenue, monthlyRevenue, last6Months, pendingQuotes, upcomingOrders, currentMonthOrdersList };
   };
 
   const insights = calculateInsights();
@@ -919,11 +947,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <h1 className="text-3xl font-bold text-gray-800 mb-8">Dashboard Overview</h1>
         <div className="space-y-8">
           <div className="grid md:grid-cols-4 gap-6">
-            <div className="bg-white p-6 rounded-xl shadow border-l-4 border-blue-500">
+            <div onClick={() => { setActiveTab('calendar'); setFilterType('All'); }} className="bg-white p-6 rounded-xl shadow border-l-4 border-blue-500 cursor-pointer hover:shadow-lg transition">
               <p className="text-gray-500 text-sm font-bold uppercase">Total Orders</p>
               <p className="text-3xl font-bold text-gray-800 mt-2">{insights.totalOrders}</p>
             </div>
-            <div className="bg-white p-6 rounded-xl shadow border-l-4 border-green-500">
+            <div onClick={() => { setActiveTab('calendar'); setFilterType('Month'); }} className="bg-white p-6 rounded-xl shadow border-l-4 border-green-500 cursor-pointer hover:shadow-lg transition">
               <p className="text-gray-500 text-sm font-bold uppercase">This Month Orders</p>
               <p className="text-3xl font-bold text-gray-800 mt-2">{insights.monthlyOrders}</p>
             </div>
@@ -931,9 +959,82 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <p className="text-gray-500 text-sm font-bold uppercase">Total Revenue (Est)</p>
               <p className="text-3xl font-bold text-gray-800 mt-2">₹ {insights.totalRevenue.toLocaleString()}</p>
             </div>
+            <div onClick={() => { setActiveTab('calendar'); setFilterType('Pending'); }} className="bg-white p-6 rounded-xl shadow border-l-4 border-yellow-500 cursor-pointer hover:shadow-lg transition">
+              <p className="text-gray-500 text-sm font-bold uppercase">Pending Quotes</p>
+              <p className="text-3xl font-bold text-gray-800 mt-2">{insights.pendingQuotes}</p>
+            </div>
             <div className="bg-white p-6 rounded-xl shadow border-l-4 border-jms-red">
               <p className="text-gray-500 text-sm font-bold uppercase">This Month Revenue</p>
               <p className="text-3xl font-bold text-gray-800 mt-2">₹ {insights.monthlyRevenue.toLocaleString()}</p>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8">
+            {/* Upcoming Orders Section */}
+            <div className="bg-white p-8 rounded-xl shadow">
+              <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                <CalendarIcon size={20} className="text-jms-red" /> Upcoming Orders
+              </h3>
+              {insights.upcomingOrders.length > 0 ? (
+                <div className="space-y-4">
+                  {insights.upcomingOrders.slice(0, 5).map(order => (
+                    <div
+                      key={order.id}
+                      onClick={() => setSelectedOrderForDetails(order)}
+                      className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100 cursor-pointer hover:bg-gray-100 transition"
+                    >
+                      <div>
+                        <p className="font-bold text-gray-800">{order.customerName}</p>
+                        <p className="text-sm text-gray-500">{format(new Date(order.eventDate), 'dd MMM yyyy')} • {order.mealType}</p>
+                      </div>
+                      <span className={`px-2 py-1 text-xs rounded-full ${order.status === 'Confirmed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                        {order.status}
+                      </span>
+                    </div>
+                  ))}
+                  {insights.upcomingOrders.length > 5 && (
+                    <button onClick={() => { setActiveTab('calendar'); setFilterType('Future'); }} className="text-blue-600 hover:text-blue-800 text-sm font-medium w-full text-center mt-2">
+                      View All Upcoming
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <p className="text-gray-500 italic text-center py-8">No upcoming orders.</p>
+              )}
+            </div>
+
+            {/* Current Month Orders Section */}
+            <div className="bg-white p-8 rounded-xl shadow">
+              <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                <CalendarIcon size={20} className="text-blue-600" /> Current Month Orders
+              </h3>
+              {insights.currentMonthOrdersList.length > 0 ? (
+                <div className="space-y-4">
+                  {insights.currentMonthOrdersList.slice(0, 5).map(order => (
+                    <div
+                      key={order.id}
+                      onClick={() => setSelectedOrderForDetails(order)}
+                      className="flex items-center justify-between p-4 bg-blue-50/50 rounded-lg border border-blue-100 cursor-pointer hover:bg-blue-100 transition"
+                    >
+                      <div>
+                        <p className="font-bold text-gray-800">{order.customerName}</p>
+                        <p className="text-sm text-gray-500">{format(new Date(order.eventDate), 'dd MMM')} • {order.guestCount} Pax</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-gray-900 text-sm">₹ {order.totalEstimatedCost.toLocaleString()}</p>
+                        <span className={`text-xs ${order.status === 'Completed' ? 'text-green-600' : 'text-orange-600'}`}>{order.status}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {insights.currentMonthOrdersList.length > 5 && (
+                    <button onClick={() => { setActiveTab('calendar'); setFilterType('Month'); }} className="text-blue-600 hover:text-blue-800 text-sm font-medium w-full text-center mt-2">
+                      View All
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <p className="text-gray-500 italic text-center py-8">No orders for this month.</p>
+              )}
             </div>
           </div>
 
@@ -985,6 +1086,274 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Order Details Modal */}
+      {selectedOrderForDetails && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b sticky top-0 bg-white z-10 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-gray-800">Order Details #{selectedOrderForDetails.id}</h2>
+              <button onClick={() => setSelectedOrderForDetails(null)} className="p-2 hover:bg-gray-100 rounded-full">
+                <X size={24} className="text-gray-500" />
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="font-bold text-gray-700 mb-2 flex items-center gap-2"><User size={18} /> Customer</h3>
+                  <p className="text-lg font-semibold">{selectedOrderForDetails.customerName}</p>
+                  <p className="text-gray-600 flex items-center gap-1"><Phone size={14} /> {selectedOrderForDetails.customerPhone}</p>
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-700 mb-2 flex items-center gap-2"><CalendarIcon size={18} /> Event</h3>
+                  <p>{format(new Date(selectedOrderForDetails.eventDate), 'dd MMMM yyyy')}</p>
+                  <p className="text-gray-600">{selectedOrderForDetails.eventTime} • {selectedOrderForDetails.mealType}</p>
+                  <p className="text-gray-600 mt-1 flex items-start gap-1"><MapPin size={14} className="mt-1 flex-shrink-0" /> {selectedOrderForDetails.address}</p>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2"><Utensils size={18} /> Menu Items</h3>
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <ul className="space-y-3">
+                    {selectedOrderForDetails.items.map((item, idx) => (
+                      <li key={idx} className="border-b border-gray-200 pb-2 last:border-0 last:pb-0">
+                        <div className="flex justify-between">
+                          <span className="font-semibold">{idx + 1}. {item.name}</span>
+                          <span className="text-sm bg-gray-200 px-2 py-0.5 rounded text-gray-700">x{item.quantity}</span>
+                        </div>
+                        {item.isPreset && item.selectedOptions && (
+                          <ul className="pl-6 mt-1 space-y-1 text-sm text-gray-600 list-disc">
+                            {item.fixedItems?.map((f, i) => <li key={`fix-${i}`}>{f}</li>)}
+                            {Object.entries(item.selectedOptions).map(([key, val]) => (
+                              <li key={key}><span className="font-medium">{key}:</span> {val}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 p-4 rounded-lg flex justify-between items-center">
+                <div>
+                  <p className="text-sm text-blue-800 font-bold uppercase">Current Status</p>
+                  <p className="text-blue-900 font-medium">{selectedOrderForDetails.status}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-blue-800 font-bold uppercase">Total Estimated Cost</p>
+                  <p className="text-2xl font-bold text-blue-900">₹ {selectedOrderForDetails.totalEstimatedCost.toLocaleString()}</p>
+                </div>
+              </div>
+
+              {selectedOrderForDetails.status === 'Pending' && (selectedOrderForDetails.totalEstimatedCost === 0 || !selectedOrderForDetails.totalEstimatedCost) && (
+                <div className="text-center">
+                  <button
+                    onClick={() => {
+                      startEstimating(selectedOrderForDetails);
+                      setSelectedOrderForDetails(null);
+                      setActiveTab('calendar');
+                    }}
+                    className="bg-jms-red text-white py-2 px-6 rounded-lg font-bold hover:bg-jms-dark transition shadow-lg"
+                  >
+                    Create Quote Now
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quote Estimation Modal */}
+      {estimatingOrder && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b sticky top-0 bg-white z-10 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-800">Create Quote</h2>
+              <button onClick={() => setEstimatingOrder(null)} className="p-2 hover:bg-gray-100 rounded-full">
+                <X size={24} className="text-gray-500" />
+              </button>
+            </div>
+
+            <div className="grid lg:grid-cols-2 gap-6 p-6">
+              {/* Left Side: Order Details Summary */}
+              <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 h-full overflow-y-auto max-h-[600px] custom-scrollbar">
+                <h3 className="font-bold text-gray-700 mb-4 border-b pb-2">Order Summary</h3>
+                {orders.find(o => o.id === estimatingOrder) && (
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-xs text-gray-500 font-bold uppercase">Customer</p>
+                      <p className="font-medium">{orders.find(o => o.id === estimatingOrder)?.customerName}</p>
+                      <p className="text-sm text-gray-600">{orders.find(o => o.id === estimatingOrder)?.customerPhone}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 font-bold uppercase">Event Details</p>
+                      <p className="text-sm">{format(new Date(orders.find(o => o.id === estimatingOrder)!.eventDate), 'dd MMM yyyy')} • {orders.find(o => o.id === estimatingOrder)?.eventTime}</p>
+                      <p className="text-sm mt-1">{orders.find(o => o.id === estimatingOrder)?.address}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 font-bold uppercase mb-2">Menu</p>
+                      <ul className="text-sm space-y-2">
+                        {orders.find(o => o.id === estimatingOrder)?.items.map((item, idx) => (
+                          <li key={idx} className="border-l-2 border-jms-red pl-2">
+                            <p className="font-semibold">{item.name}</p>
+                            {item.isPreset && item.selectedOptions && (
+                              <p className="text-xs text-gray-600 mt-1">
+                                {Object.values(item.selectedOptions).join(', ')}
+                              </p>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Right Side: Cost Editing */}
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Guest Count (Pax)</label>
+                  <input
+                    type="number"
+                    value={guestCount}
+                    onChange={(e) => setGuestCount(Number(e.target.value))}
+                    className="w-full p-2 border rounded focus:ring-2 focus:ring-jms-red focus:border-jms-red"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Price Per Head (₹)</label>
+                  <input
+                    type="number"
+                    value={perHeadAmount}
+                    onChange={(e) => {
+                      setPerHeadAmount(Number(e.target.value));
+                      setManualTotalCost(null); // Reset manual override if per head changes
+                    }}
+                    className="w-full p-2 border rounded focus:ring-2 focus:ring-jms-red focus:border-jms-red"
+                    placeholder="Enter amount"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Base Cost: ₹ {(perHeadAmount * guestCount).toLocaleString()}</p>
+                </div>
+
+                <div className="border-t pt-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="font-bold text-gray-700">Additional Costs</p>
+                  </div>
+                  {/* Additional Cost List */}
+                  <div className="space-y-2 mb-4 bg-gray-50 p-2 rounded">
+                    {(additionalCosts[estimatingOrder] || []).map((cost, idx) => (
+                      <div key={idx} className="flex justify-between text-sm items-center">
+                        <span>{cost.label} {cost.quantity && cost.quantity > 1 ? `(x${cost.quantity})` : ''}</span>
+                        <div className="flex items-center gap-2">
+                          <span>₹ {cost.amount * (cost.quantity || 1)}</span>
+                          <button
+                            onClick={() => {
+                              setAdditionalCosts(prev => ({
+                                ...prev,
+                                [estimatingOrder]: prev[estimatingOrder].filter((_, i) => i !== idx)
+                              }));
+                              setManualTotalCost(null);
+                            }}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {(!additionalCosts[estimatingOrder] || additionalCosts[estimatingOrder].length === 0) && (
+                      <p className="text-xs text-gray-400 italic text-center">No additional costs added.</p>
+                    )}
+                  </div>
+
+                  {/* Add Cost Form */}
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <select
+                      value={newCostType}
+                      onChange={(e) => { setNewCostType(e.target.value); setNewCostLabel(e.target.value === 'Other' ? '' : e.target.value); }}
+                      className="p-2 text-sm border rounded"
+                    >
+                      <option value="Transportation">Transportation</option>
+                      <option value="Service Staff">Service Staff</option>
+                      <option value="Cleaning">Cleaning</option>
+                      <option value="Water/Beverages">Water/Beverages</option>
+                      <option value="Packaging">Packaging</option>
+                      <option value="Other">Other (Custom)</option>
+                    </select>
+                    <input
+                      type="number"
+                      value={newCostAmount}
+                      onChange={(e) => setNewCostAmount(Number(e.target.value))}
+                      placeholder="Cost per unit"
+                      className="p-2 text-sm border rounded"
+                    />
+                  </div>
+                  {newCostType === 'Other' && (
+                    <input
+                      type="text"
+                      value={newCostLabel}
+                      onChange={(e) => setNewCostLabel(e.target.value)}
+                      placeholder="Cost Name (e.g. Generator)"
+                      className="w-full p-2 text-sm border rounded mb-2"
+                    />
+                  )}
+                  <button
+                    onClick={() => {
+                      if (!newCostLabel || newCostAmount <= 0) return;
+                      setAdditionalCosts(prev => ({
+                        ...prev,
+                        [estimatingOrder]: [...(prev[estimatingOrder] || []), {
+                          id: Date.now().toString(),
+                          label: newCostLabel,
+                          amount: newCostAmount,
+                          type: 'fixed', // Simple fixed for now
+                          quantity: 1
+                        }]
+                      }));
+                      setNewCostAmount(0);
+                      // Keep label if standard, clear if custom? Keep it simple.
+                      setManualTotalCost(null);
+                    }}
+                    className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-medium py-2 rounded"
+                  >
+                    + Add Cost
+                  </button>
+                </div>
+
+                <div className="bg-blue-50 p-4 rounded-lg mt-6">
+                  <p className="text-sm text-blue-800 font-bold uppercase mb-1">Total Estimated Cost</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-bold text-blue-900">₹</span>
+                    <input
+                      type="number"
+                      value={finalTotalEstimate(estimatingOrder)}
+                      onChange={(e) => setManualTotalCost(Number(e.target.value))}
+                      className="text-2xl font-bold text-blue-900 bg-transparent border-b-2 border-blue-300 focus:border-blue-600 focus:outline-none w-full"
+                    />
+                  </div>
+                  {manualTotalCost !== null && (
+                    <p className="text-xs text-orange-600 mt-1 font-medium">⚠️ Manual override active</p>
+                  )}
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <button onClick={() => setEstimatingOrder(null)} className="flex-1 py-3 text-gray-600 font-bold hover:bg-gray-100 rounded-lg">Cancel</button>
+                  <button
+                    onClick={() => submitQuote(orders.find(o => o.id === estimatingOrder)!)}
+                    className="flex-1 bg-jms-red text-white py-3 rounded-lg font-bold hover:bg-jms-dark transition shadow-lg"
+                  >
+                    Submit Quote
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {activeTab === 'menu' && (
         <div className="grid md:grid-cols-3 gap-8">
@@ -1237,48 +1606,111 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {activeTab === 'calendar' && (
         <div className="space-y-6">
-          {orders.length === 0 ? (
-            <div className="text-center py-20 bg-white rounded-xl shadow">
-              <CalendarIcon className="mx-auto text-gray-300 mb-4" size={48} />
-              <p className="text-gray-500 text-lg">No orders found.</p>
+          {/* Filter Controls */}
+          <div className="flex items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <div className="flex gap-2">
+              {['All', 'Pending', 'Month', 'Future'].map(f => (
+                <button
+                  key={f}
+                  onClick={() => setFilterType(f as any)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${filterType === f ? 'bg-jms-dark text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                >
+                  {f === 'All' ? 'All Orders' : f === 'Pending' ? 'Pending Quotes' : f === 'Month' ? 'This Month' : 'Upcoming'}
+                </button>
+              ))}
             </div>
-          ) : (
-            <div className="grid lg:grid-cols-2 gap-8">
-              {/* Quote Not Submitted - Pending or Zero Estimates */}
-              <div className="space-y-4">
-                <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200 mb-4">
-                  <h3 className="font-bold text-yellow-800 uppercase tracking-wider flex items-center gap-2">
-                    <Clock size={18} /> Quote Not Submitted
-                  </h3>
-                </div>
-                {orders
-                  .filter(o => !o.totalEstimatedCost || o.totalEstimatedCost === 0)
-                  .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime())
-                  .map(renderOrder)}
+            {filterType !== 'All' && (
+              <button onClick={() => setFilterType('All')} className="text-sm text-red-500 hover:text-red-700 font-medium">Clear Filter</button>
+            )}
+          </div>
 
-                {orders.filter(o => !o.totalEstimatedCost || o.totalEstimatedCost === 0).length === 0 && (
-                  <p className="text-gray-400 text-center py-10 italic">No pending quotes</p>
+          {/* Filter Logic */}
+          {(() => {
+            let filteredOrders = orders;
+            if (filterType === 'Pending') {
+              filteredOrders = orders.filter(o => !o.totalEstimatedCost || o.totalEstimatedCost === 0);
+            } else if (filterType === 'Month') {
+              const now = new Date();
+              filteredOrders = orders.filter(o => {
+                const d = new Date(o.eventDate);
+                return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+              });
+            } else if (filterType === 'Future') {
+              filteredOrders = orders.filter(o => new Date(o.eventDate) >= new Date());
+            }
+
+            // Scroll to highlighted order
+            if (highlightOrderId) {
+              setTimeout(() => {
+                const el = document.getElementById(`order-${highlightOrderId}`);
+                if (el) {
+                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  el.classList.add('ring-4', 'ring-jms-red', 'ring-opacity-50');
+                  setTimeout(() => el.classList.remove('ring-4', 'ring-jms-red', 'ring-opacity-50'), 2000);
+                  setHighlightOrderId(null);
+                }
+              }, 100);
+            }
+
+            if (filteredOrders.length === 0) {
+              return (
+                <div className="text-center py-20 bg-white rounded-xl shadow">
+                  <CalendarIcon className="mx-auto text-gray-300 mb-4" size={48} />
+                  <p className="text-gray-500 text-lg">No orders found for this filter.</p>
+                  <button onClick={() => setFilterType('All')} className="mt-4 text-jms-red font-bold hover:underline">View All Orders</button>
+                </div>
+              );
+            }
+
+            return (
+              <div className="space-y-8">
+                {/* Group by Pending / Confirmed / Completed if 'All' or specific filter needs separation, 
+                     but for simplicity in filtered view, we list them directly or group visually.
+                     Let's keep the Pending vs Submitted split but apply filter to both lists. 
+                 */}
+
+                {/* Pending Quotes Section (if relevant to filter) */}
+                {(filterType === 'All' || filterType === 'Pending') && filteredOrders.some(o => !o.totalEstimatedCost || o.totalEstimatedCost === 0) && (
+                  <div className="space-y-4">
+                    <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200 mb-4 sticky top-20 z-10">
+                      <h3 className="font-bold text-yellow-800 uppercase tracking-wider flex items-center gap-2">
+                        <Clock size={18} /> Quote Not Submitted
+                      </h3>
+                    </div>
+                    {filteredOrders
+                      .filter(o => !o.totalEstimatedCost || o.totalEstimatedCost === 0)
+                      .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime())
+                      .map(order => (
+                        <div id={`order-${order.id}`} key={order.id}>
+                          {renderOrder(order)}
+                        </div>
+                      ))
+                    }
+                  </div>
+                )}
+
+                {/* Submitted / confirmed Section */}
+                {(filterType !== 'Pending') && filteredOrders.some(o => o.totalEstimatedCost > 0) && (
+                  <div className="space-y-4">
+                    <div className="bg-green-50 p-3 rounded-lg border border-green-200 mb-4 sticky top-20 z-10">
+                      <h3 className="font-bold text-green-800 uppercase tracking-wider flex items-center gap-2">
+                        <Check size={18} /> Orders & Quotes
+                      </h3>
+                    </div>
+                    {filteredOrders
+                      .filter(o => o.totalEstimatedCost > 0)
+                      .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime())
+                      .map(order => (
+                        <div id={`order-${order.id}`} key={order.id}>
+                          {renderOrder(order)}
+                        </div>
+                      ))
+                    }
+                  </div>
                 )}
               </div>
-
-              {/* Quote Submitted - Has Estimates */}
-              <div className="space-y-4">
-                <div className="bg-green-50 p-3 rounded-lg border border-green-200 mb-4">
-                  <h3 className="font-bold text-green-800 uppercase tracking-wider flex items-center gap-2">
-                    <Check size={18} /> Quote Submitted
-                  </h3>
-                </div>
-                {orders
-                  .filter(o => o.totalEstimatedCost > 0)
-                  .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime())
-                  .map(renderOrder)}
-
-                {orders.filter(o => o.totalEstimatedCost > 0).length === 0 && (
-                  <p className="text-gray-400 text-center py-10 italic">No submitted quotes</p>
-                )}
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
     </div>

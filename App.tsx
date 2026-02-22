@@ -4,6 +4,7 @@ import { Home } from './pages/Home.tsx';
 import { Login } from './pages/Login.tsx';
 import { AdminDashboard } from './pages/AdminDashboard.tsx';
 import { CustomerDashboard } from './pages/CustomerDashboard.tsx';
+import { ProfileModal } from './components/ProfileModal.tsx';
 import { UserRole, MenuItem, Order, PresetMenu } from './types.ts';
 import {
   getMenuItems,
@@ -110,6 +111,9 @@ export default function App() {
     await deletePresetMenuService(id);
     setPresetMenus(prev => prev.filter(i => i.id !== id));
   };
+
+  // Profile Modal State
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const renderPage = () => {
     if (loading) {
@@ -235,11 +239,21 @@ export default function App() {
           onLogout={handleLogout}
           onNavigate={handleNavigate}
           currentPage={currentPage}
+          onOpenProfile={() => setIsProfileOpen(true)}
         />
       )}
       <main>
         {renderPage()}
       </main>
+
+      {/* Profile Modal */}
+      {isProfileOpen && (
+        <ProfileModal
+          user={{ ...currentUser, role: userRole }}
+          onClose={() => setIsProfileOpen(false)}
+          onLogout={() => { setIsProfileOpen(false); handleLogout(); }}
+        />
+      )}
     </div>
   );
 }
