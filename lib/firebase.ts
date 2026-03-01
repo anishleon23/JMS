@@ -1,5 +1,5 @@
 import { initializeApp, getApp, getApps } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, sendPasswordResetEmail } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -33,3 +33,24 @@ try {
 }
 
 export { auth, db };
+
+/**
+ * Sends a Firebase password reset email to the given address.
+ * Returns { success: true } or { success: false, error: string }
+ */
+export const sendPasswordReset = async (email: string): Promise<{ success: boolean; error?: string }> => {
+  if (!auth) {
+    return { success: false, error: "Firebase is not configured. Password reset is unavailable in demo mode." };
+  }
+  try {
+    await sendPasswordResetEmail(auth, email);
+    return { success: true };
+  } catch (err: any) {
+    const msg = err?.code === 'auth/user-not-found'
+      ? 'No account found with this email address.'
+      : err?.code === 'auth/invalid-email'
+        ? 'Please enter a valid email address.'
+        : 'Failed to send reset email. Please try again.';
+    return { success: false, error: msg };
+  }
+};

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { User, UserRole } from '../types';
-import { X, Lock, User as UserIcon } from 'lucide-react';
+import { X, Lock, User as UserIcon, Mail } from 'lucide-react';
 import { updateUser, getUserByPhone } from '../services/db';
 
 interface ProfileModalProps {
-    user: { name: string, phone: string, role?: UserRole };
+    user: { name: string, phone: string, email?: string, role?: UserRole };
     onClose: () => void;
     onLogout: () => void;
 }
@@ -77,6 +77,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onLog
                         </div>
                         <h3 className="font-bold text-xl">{user.name}</h3>
                         <p className="text-gray-500">{user.phone}</p>
+                        {user.email && (
+                            <p className="text-gray-400 text-sm flex items-center justify-center gap-1 mt-1">
+                                <Mail size={13} /> {user.email}
+                            </p>
+                        )}
                         <span className="inline-block mt-2 px-3 py-1 bg-gray-100 rounded-full text-xs font-semibold text-gray-600">
                             {user.role || 'Guest'}
                         </span>

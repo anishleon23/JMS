@@ -21,7 +21,7 @@ import {
 export default function App() {
   const [currentPage, setCurrentPage] = useState('home');
   const [userRole, setUserRole] = useState<UserRole>(UserRole.GUEST);
-  const [currentUser, setCurrentUser] = useState<{ name: string, phone: string }>({ name: '', phone: '' });
+  const [currentUser, setCurrentUser] = useState<{ name: string, phone: string, email?: string }>({ name: '', phone: '' });
 
   // App State
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -50,9 +50,9 @@ export default function App() {
     window.scrollTo(0, 0);
   };
 
-  const handleLogin = (role: UserRole, name: string, phone: string) => {
+  const handleLogin = (role: UserRole, name: string, phone: string, email?: string) => {
     setUserRole(role);
-    setCurrentUser({ name, phone });
+    setCurrentUser({ name, phone, email });
     if (role === UserRole.ADMIN) {
       handleNavigate('admin-dashboard');
     } else {
