@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin-dashboard
+Disallow: /admin-menu
+
+# Sitemap
+Sitemap: https://jmscatering.in/sitemap.xml

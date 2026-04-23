@@ -18,6 +18,13 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, userRole }) => {
     '/hero_service.png'
   ];
 
+  const heroImageAlts = [
+    'JMS Catering Services – Grand South Indian wedding feast spread in Chennai',
+    'JMS Catering Services – South Indian buffet catering for events in Chennai',
+    'JMS Catering – Traditional South Indian sweets and desserts for weddings Chennai',
+    'JMS Catering professional service team at a wedding event in Chennai'
+  ];
+
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentImageIndex((prev) => (prev + 1) % heroImages.length);
@@ -49,7 +56,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, userRole }) => {
           >
             <img
               src={heroImages[currentImageIndex]}
-              alt="Catering Ambience"
+              alt={heroImageAlts[currentImageIndex]}
               className="w-full h-full object-cover"
             />
           </motion.div>
@@ -70,9 +77,9 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, userRole }) => {
             </motion.div>
 
             <motion.h1 className="text-5xl md:text-8xl font-bold text-white mb-8 leading-tight drop-shadow-2xl tracking-tight">
-              <span className="block mb-2">Authentic Taste of</span>
+              <span className="block mb-2">JMS Catering Services –</span>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-jms-orange via-red-500 to-jms-red filter drop-shadow-lg">
-                South India
+                Chennai's Finest Caterers
               </span>
             </motion.h1>
 
@@ -211,9 +218,9 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, userRole }) => {
 
           <div className="grid md:grid-cols-3 gap-10">
             {[
-              { img: '/food_idli.png', title: 'Breakfast', subtitle: 'Divine Mornings', desc: 'Soft Idlis, Crispy Vadas & Chutneys' },
-              { img: '/food_curry.png', title: 'Curries', subtitle: 'Spice Symphony', desc: 'Rich Chettinad & Traditional Gravies' },
-              { img: '/food_variety.png', title: 'Rice Varieties', subtitle: 'Colorful Feasts', desc: 'Lemon, Tamarind & Curd Rice' },
+              { img: '/food_idli.png', title: 'Breakfast', subtitle: 'Divine Mornings', desc: 'Soft Idlis, Crispy Vadas & Chutneys', alt: 'South Indian breakfast catering – Idli Vada spread for events Chennai' },
+              { img: '/food_curry.png', title: 'Curries', subtitle: 'Spice Symphony', desc: 'Rich Chettinad & Traditional Gravies', alt: 'Chettinad curry catering for weddings and events in Chennai' },
+              { img: '/food_variety.png', title: 'Rice Varieties', subtitle: 'Colorful Feasts', desc: 'Lemon, Tamarind & Curd Rice', alt: 'South Indian rice variety catering – Lemon, Tamarind and Curd rice for functions Chennai' },
             ].map((item, index) => (
               <motion.div
                 key={index}
@@ -226,7 +233,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, userRole }) => {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent z-10 opacity-80 group-hover:opacity-60 transition-opacity duration-500"></div>
                 <img
                   src={item.img}
-                  alt={item.title}
+                  alt={item.alt}
                   className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
                 />
                 <div className="absolute bottom-0 left-0 right-0 p-10 z-20 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
@@ -311,6 +318,94 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, userRole }) => {
         </div>
       </section>
 
+      {/* Testimonials Section */}
+      <section className="py-24 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-black text-gray-900 mb-4">What Our Clients Say</h2>
+            <p className="text-gray-500 text-lg">Trusted by thousands of families and corporates across Chennai</p>
+            <div className="w-24 h-1 bg-jms-orange mx-auto mt-4 rounded-full"></div>
+          </div>
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              { name: "Priya Rajan", event: "Wedding Reception, Adyar", rating: 5, review: "JMS Catering made our wedding feast absolutely memorable. The South Indian spread was authentic, hygienic and every guest was impressed. Highly recommend for wedding catering in Chennai!" },
+              { name: "Karthik Venkatesh", event: "Corporate Event, OMR", rating: 5, review: "We hired JMS for our company's annual day with 500 employees. Their professionalism and food quality for corporate catering in Chennai is unmatched. Will definitely book again." },
+              { name: "Meena Subramaniam", event: "House Warming, Kattupakkam", rating: 5, review: "From the traditional Pongal to the rice varieties, everything was perfect for our house warming ceremony. JMS Catering is the best caterer we've worked with in Chennai." }
+            ].map((t, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.15 }}
+                className="bg-white p-8 rounded-3xl shadow-lg border border-gray-100 hover:shadow-xl transition-shadow"
+              >
+                <div className="flex mb-4">
+                  {[...Array(t.rating)].map((_, s) => (
+                    <Star key={s} size={18} className="text-yellow-400 fill-yellow-400" />
+                  ))}
+                </div>
+                <p className="text-gray-600 leading-relaxed mb-6 italic">"{t.review}"</p>
+                <div className="border-t border-gray-100 pt-4">
+                  <p className="font-bold text-gray-900">{t.name}</p>
+                  <p className="text-sm text-jms-orange">{t.event}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section id="faq" className="py-24 bg-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-black text-gray-900 mb-4">Frequently Asked Questions</h2>
+            <p className="text-gray-500 text-lg">Everything you need to know about our catering services in Chennai</p>
+            <div className="w-24 h-1 bg-jms-green mx-auto mt-4 rounded-full"></div>
+          </div>
+          <div className="space-y-4">
+            {[
+              {
+                q: "What types of catering services does JMS Catering offer in Chennai?",
+                a: "JMS Catering Services offers a full range of catering in Chennai including wedding catering, corporate event catering, house warming ceremonies, birthday & anniversary events, and industrial or office catering. We serve both vegetarian and non-vegetarian South Indian menus."
+              },
+              {
+                q: "How much does wedding catering cost in Chennai?",
+                a: "Wedding catering costs in Chennai vary based on the number of guests, menu selection (vegetarian or non-vegetarian), and service style. JMS Catering offers customized packages to suit all budgets. Contact us at 9840364388 for a free personalized quote."
+              },
+              {
+                q: "Does JMS Catering serve vegetarian-only menus?",
+                a: "Yes! JMS Catering specializes in both pure vegetarian and non-vegetarian South Indian menus. Our vegetarian spread includes traditional Brahmin-style feasts, Chettinad preparations, and a wide variety of rice dishes, curries, and sweets."
+              },
+              {
+                q: "Where is JMS Catering Services located in Chennai?",
+                a: "JMS Catering Services is located at 328, 1st Street, P G Avenue, Kattupakkam, Chennai – 600056. We provide catering services across all areas of Chennai including Anna Nagar, Adyar, OMR, Porur, and surrounding areas."
+              },
+              {
+                q: "How do I book JMS Catering for my event?",
+                a: "You can book JMS Catering Services by calling us at 9840364388 (Mr. J. Mohan Singh), or by using the 'Request a Callback' form on our website. We recommend booking at least 2–4 weeks in advance for large events."
+              }
+            ].map((faq, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.08 }}
+                className="bg-gray-50 border border-gray-200 rounded-2xl p-6 hover:border-jms-green transition-colors"
+              >
+                <h3 className="font-bold text-gray-900 text-lg mb-3 flex items-start gap-3">
+                  <span className="text-jms-green font-black text-2xl leading-none mt-0.5">Q</span>
+                  {faq.q}
+                </h3>
+                <p className="text-gray-600 leading-relaxed pl-8">{faq.a}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer id="contact" className="bg-jms-dark text-white py-20 border-t border-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -330,7 +425,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, userRole }) => {
                   </div>
                   <div>
                     <h4 className="font-bold text-xl mb-2">Visit Our Office</h4>
-                    <p className="text-gray-400 leading-relaxed text-lg">328, 1st Street, P G Avenue,<br />Kattupakkam, Chennai - 600056</p>
+                    <address className="not-italic text-gray-400 leading-relaxed text-lg">328, 1st Street, P G Avenue,<br />Kattupakkam, Chennai - 600056</address>
                   </div>
                 </div>
 
